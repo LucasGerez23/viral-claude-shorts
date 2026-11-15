@@ -25,3 +25,5 @@ interface Visual {
   bg?: string;
   build(w: World): (t: number) => void;
 }
+
+declare const BRAND: Readonly<ReturnType<typeof import('../../core/identity.ts').identityFor>>;

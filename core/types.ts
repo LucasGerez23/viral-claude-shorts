@@ -25,7 +25,7 @@ export interface Scene {
   t0: number;
   t1: number;
 }
-export interface Plan { style: string; fps: number; format: string; notes?: string; duration: number; scenes: Scene[];
+export interface Plan { style: string; fps: number; format: string; notes?: string; theme?: 'light' | 'dark'; duration: number; scenes: Scene[];
   music?: { bpm?: number; key?: string } }   // the soundtrack's tempo and key (default 96 BPM in D)
 
 // script.json (only when the voice is generated with voice.ts)

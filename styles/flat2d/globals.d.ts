@@ -11,3 +11,5 @@ interface Visual {
   html(s: Scene): string;
   anim?(tl: gsap.core.Timeline, s: Scene, K: (key: string, fallback?: number) => number, $: (selector: string) => string): void;
 }
+
+declare const BRAND: Readonly<ReturnType<typeof import('../../core/identity.ts').identityFor>>;

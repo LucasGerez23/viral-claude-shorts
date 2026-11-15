@@ -45,7 +45,7 @@ function build3D(tl: gsap.core.Timeline) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const worlds = SCENES.scenes.map((s) => {
     const V = VISUALS[s.id] || LIBRARY[s.type] || LIBRARY.object;
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(V.bg || P3_SKY);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(BRAND.background);
     const camera = new THREE.PerspectiveCamera(40, 1080 / 1920, 0.1, 1000);
     const w: World = {
       s, scene, camera, renderer, tl, K: keyOf(s),

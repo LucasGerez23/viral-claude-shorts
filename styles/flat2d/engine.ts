@@ -14,8 +14,7 @@ function buildTimeline(): gsap.core.Timeline {
     const sec = document.getElementById('sc-' + s.id)!, $ = (q: string) => '#sc-' + s.id + ' ' + q;
     const K = (id: string, fb?: number) => { const c = (s.keys || []).find((c) => c.id === id); return c ? c.t : (fb ?? s.t0 + 0.5); };
     const V = VISUALS[s.id] || LIBRARY[s.type] || LIBRARY.object;
-    if (V.bg) sec.style.background = V.bg;
-    if (V.ink) sec.style.setProperty('--ink', V.ink);   // light backgrounds: dark title (contrast >= 3:1)
+    sec.style.background = BRAND.background;
     sec.querySelector('.art')!.innerHTML = V.html(s);
     // ---- titles
     const T = sec.querySelector('.titles')!;
@@ -29,7 +28,6 @@ function buildTimeline(): gsap.core.Timeline {
       if (hl) {
         const tHl = Math.min(said(s.highlight!, s) ?? s.t0 + 0.5, s.t1 - 0.6);   // never half done at the cut
         tl.fromTo($('.box'), { scaleX: 0 }, { scaleX: 1, duration: 0.28, ease: 'power2.out' }, tHl);
-        tl.fromTo($('.word.hl'), { color: 'var(--ink)' }, { color: 'var(--accent-text)', duration: 0.12 }, tHl + 0.16);   // ends once the box already covers the word
       }
     }
     if (s.stat) {

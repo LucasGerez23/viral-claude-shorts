@@ -16,3 +16,7 @@ Make it in one go: design and test the video's world first (`plan.md`, the world
 ## If something is missing
 
 If `node_modules`, `.venv` or a tool (Node 22.18+, ffmpeg, Python 3.10 to 3.14) is missing, the project isn't set up yet: run the authorized project setup steps in `prompts/setup-<style>.md` first. The same goes for a style they ask for whose `styles/<style>/node_modules` is missing.
+
+## Identidad visual institucional
+
+Aplicá `docs/IDENTIDAD.md` a todo video. Elegí un solo `theme` por video (claro por defecto) y usá `BRAND` en el arte. Fijá el título arriba, el protagonista al centro, y los subtítulos al pie dentro del margen seguro. Revisá en el storyboard apertura, cierre, legibilidad y presencia de la paleta.
