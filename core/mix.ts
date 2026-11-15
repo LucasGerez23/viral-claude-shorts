@@ -1,38 +1,42 @@
 #!/usr/bin/env node
-// Shared final step: the style's video (no audio) + the voice + the music -> final.mp4 ready to upload.
-//   usage: node core/mix.ts videos/<topic> <silent-video.mp4> [--music -16]
-//   The music sits "--music" dB under the voice and ducks a bit more while you talk (sidechain);
-//   everything is normalized to -14 LUFS (what YouTube / TikTok / Reels expect).
-//   writes videos/<topic>/final.mp4 (H.264 + AAC, 1080x1920) and mix.wav
+// Independent voice, music, SFX and ambience; --audio-only prepares preview audio.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { mixInputs } from './audio.ts';
 
 const argv = process.argv.slice(2);
-const opt = (k: string, d: number) => { const i = argv.indexOf(k); return i >= 0 ? argv.splice(i, 2)[1] : d; };
-const MUS = Number(opt('--music', -16));
-const [dir, video] = argv;
-if (!dir || !video) { console.error('usage: node core/mix.ts videos/<topic> <video.mp4> [--music -16]'); process.exit(2); }
-const ROOT = path.resolve(dir);
-const voice = ['audio.wav', 'audio.mp3', 'audio.m4a'].map((f) => path.join(ROOT, f)).find((f) => fs.existsSync(f));
-if (!voice) { console.error(`there is no audio.wav, audio.mp3 or audio.m4a in ${dir}: a video without voice is watched in the preview, not rendered`); process.exit(1); }
-const mus = ['own-music.wav', 'own-music.mp3', 'own-music.m4a', 'music.wav'].map((f) => path.join(ROOT, f)).find((f) => fs.existsSync(f)) || path.join(ROOT, 'music.wav'), mix = path.join(ROOT, 'mix.wav'), out = path.join(ROOT, 'final.mp4');
-const run = (args: string[]) => { const r = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', ...args], { stdio: 'inherit' }); if (r.status !== 0) { console.error('ffmpeg failed'); process.exit(1); } };
-const vdur = Number(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video]).stdout.toString());
-
-// 1) the un-normalized mix (voice + music ducked under the voice), 2) loudnorm in TWO passes: measure, then apply with
-// the measured values (a single pass falls short with continuous voices: it gave -15 LUFS instead of -14)
-const raw = mix.replace(/\.wav$/, '.raw.wav');
-const graph = fs.existsSync(mus)
-  ? `[0:a]aresample=48000,aformat=channel_layouts=stereo,asplit=2[v][k];[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=${MUS}dB[m];` +
-    `[m][k]sidechaincompress=threshold=0.03:ratio=3:attack=40:release=450[d];[d][v]amix=inputs=2:normalize=0:duration=longest,apad[o]`
-  : `[0:a]aresample=48000,aformat=channel_layouts=stereo,apad[o]`;   // apad: so the ending isn't cut off
-run(['-i', voice, ...(fs.existsSync(mus) ? ['-i', mus] : []), '-filter_complex', graph, '-map', '[o]', '-ar', '48000', '-t', String(vdur), raw]);
-const LN = 'loudnorm=I=-14:TP=-1.5:LRA=11';
-const meas = spawnSync('ffmpeg', ['-hide_banner', '-i', raw, '-af', `${LN}:print_format=json`, '-f', 'null', '-']).stderr.toString();
-const m = JSON.parse(meas.slice(meas.lastIndexOf('{'), meas.lastIndexOf('}') + 1));
-run(['-i', raw, '-af', `${LN}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`, '-ar', '48000', mix]);
-fs.rmSync(raw, { force: true });
-run(['-i', video, '-i', mix, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p',
-  '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out]);
-console.log(`final.mp4: ${vdur.toFixed(2)} s, voice ${path.basename(voice)}${fs.existsSync(mus) ? ` + music at ${MUS} dB` : ''}, -14 LUFS -> ${out}`);
+const number = (flag: string, fallback: number) => {
+  const i = argv.indexOf(flag); if (i < 0) return fallback;
+  const value = Number(argv.splice(i, 2)[1]);
+  if (!Number.isFinite(value) || value < -60 || value > 12) throw new Error(`${flag} must be -60 to 12 dB`);
+  return value;
+};
+const options = {music: number('--music', -16), sfx: number('--sfx', -8), ambience: number('--ambience', -24), noMusic: argv.includes('--no-music'), noSfx: argv.includes('--no-sfx'), noAmbience: argv.includes('--no-ambience')};
+const audioOnly = argv.includes('--audio-only');
+const flags = new Set(['--no-music', '--no-sfx', '--no-ambience', '--audio-only']);
+for (const arg of argv) if (arg.startsWith('--') && !flags.has(arg)) throw new Error(`unknown option: ${arg}`);
+const [dir, video] = argv.filter(a => !flags.has(a));
+if (!dir || (!video && !audioOnly)) throw new Error('usage: node core/mix.ts videos/<topic> <video.mp4> OR videos/<topic> --audio-only');
+const root = path.resolve(dir), mix = path.join(root, 'mix.wav'), raw = path.join(root, 'mix.raw.wav');
+function run(command: string, args: string[]) {
+  const r = spawnSync(command, args, {encoding: 'utf8', maxBuffer: 1 << 26});
+  if (r.error || r.status !== 0) throw new Error(`${command}: ${r.error?.message ?? r.stderr}`);
+  return r;
+}
+const duration = audioOnly ? JSON.parse(fs.readFileSync(path.join(root, 'scenes.json'), 'utf8')).duration : Number(run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video!]).stdout.trim());
+if (!Number.isFinite(duration) || duration <= 0 || duration > 600) throw new Error('invalid video duration (maximum 600 seconds)');
+const {inputs, graph} = mixInputs(root, duration, options);
+const ff = (args: string[]) => run('ffmpeg', ['-y', '-hide_banner', ...args]);
+try {
+  ff([...inputs, '-filter_complex', graph, '-map', '[out]', '-ar', '48000', '-t', String(duration), raw]);
+  const ln = 'loudnorm=I=-14:TP=-1.5:LRA=11';
+  const measured = ff(['-i', raw, '-af', `${ln}:print_format=json`, '-f', 'null', '-']).stderr;
+  const m = JSON.parse(measured.slice(measured.lastIndexOf('{'), measured.lastIndexOf('}') + 1));
+  // Silence has -inf loudness: never pass non-finite measurements to FFmpeg.
+  const finite = ['input_i', 'input_tp', 'input_lra', 'input_thresh', 'target_offset'].every(k => Number.isFinite(Number(m[k])));
+  if (finite) ff(['-i', raw, '-af', `${ln}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`, '-ar', '48000', mix]);
+  else fs.copyFileSync(raw, mix);
+  if (!audioOnly) ff(['-i', video!, '-i', mix, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-t', String(duration), '-movflags', '+faststart', path.join(root, 'final.mp4')]);
+  console.log(`${audioOnly ? 'mix.wav' : 'final.mp4'}: ${duration.toFixed(2)} s; ${finite ? 'normalized to target -14 LUFS' : 'silent mix (no loudness target)'}`);
+} finally { fs.rmSync(raw, {force: true}); }

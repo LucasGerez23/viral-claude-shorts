@@ -17,7 +17,7 @@ videos/*/mix.wav
 videos/*/music.wav
 styles/flat2d/project/
 styles/3d/project/
-# the example ships only what Claude needs (scenes.json, visuals.ts, words.json, storyboard.png): its voice stays local
+# the example ships only what Codex needs (scenes.json, visuals.ts, words.json, storyboard.png): its voice stays local
 videos/blue-sky/audio.*
 videos/blue-sky/analysis.*
 videos/blue-sky/script.json
@@ -37,3 +37,9 @@ videos/hello-3d/
 # final videos go in GitHub releases, not in the repo
 videos/*/final.mp4
 .DS_Store
+
+# Generated sound stems and test scratch
+videos/*/sfx.wav
+videos/*/ambience.wav
+videos/*/mix.raw.wav
+.test-output/

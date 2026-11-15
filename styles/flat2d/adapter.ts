@@ -11,8 +11,10 @@ import { transformSync } from 'esbuild';
 import type { Adapter, Plan, Words } from '../../core/types.ts';
 
 const HERE = import.meta.dirname, PROJ = path.join(HERE, 'project');
-const HF = path.join(HERE, 'node_modules', '.bin', process.platform === 'win32' ? 'hyperframes.cmd' : 'hyperframes');
-const hf = (args: string[], o: object = {}) => spawnSync(HF, args, { cwd: HERE, encoding: 'utf8', maxBuffer: 1 << 26, ...o });
+const hp = path.join(HERE, 'node_modules', 'hyperframes');
+const bin = JSON.parse(fs.readFileSync(path.join(hp, 'package.json'), 'utf8')).bin;
+const HF = path.resolve(hp, typeof bin === 'string' ? bin : bin.hyperframes);
+const hf = (args: string[], o: object = {}) => spawnSync(process.execPath, [HF, ...args], { cwd: HERE, encoding: 'utf8', maxBuffer: 1 << 26, ...o });
 const esc = (s: unknown) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 // state of the background preview server for project/ (null if it isn't running)
@@ -33,9 +35,10 @@ const adapter: Adapter = {
     for (const f of ['engine', 'library']) fs.writeFileSync(path.join(PROJ, `${f}.js`), toJs(path.join(HERE, `${f}.ts`)));
     // the video's world (reusable pieces, their states, sets) and its scenes
     for (const [src, out] of [['world.ts', 'world.js'], ['visuals.ts', 'visuals.js']]) { const f = path.join(v, src); fs.writeFileSync(path.join(PROJ, out), fs.existsSync(f) ? toJs(f) : ''); }
+    fs.rmSync(path.join(PROJ, 'assets'), { recursive: true, force: true });
     if (fs.existsSync(path.join(v, 'assets'))) fs.cpSync(path.join(v, 'assets'), path.join(PROJ, 'assets'), { recursive: true });
-    const voice = ['mix.wav', 'audio.wav'].find((f) => fs.existsSync(path.join(v, f)));
-    if (voice) fs.copyFileSync(path.join(v, voice), path.join(PROJ, 'voice.wav'));   // to hear it in the preview; the final render remixes it
+    const voice = ['mix.wav', 'audio.wav', 'audio.mp3', 'audio.m4a'].find((f) => fs.existsSync(path.join(v, f)));
+    if (voice) fs.copyFileSync(path.join(v, voice), path.join(PROJ, voice));   // to hear it in the preview; the final render remixes it
     const D = E.duration.toFixed(3);
     const sections = E.scenes.map((s, i) => `      <section id="sc-${esc(s.id)}" class="clip scene" data-start="${s.t0}" data-duration="${(s.t1 - s.t0).toFixed(3)}" data-track-index="0" style="z-index:${i + 1}">
         <div class="art"></div><div class="titles"></div>
@@ -52,7 +55,7 @@ const adapter: Adapter = {
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="${D}" data-width="1080" data-height="1920">
 ${sections}
-${voice ? `      <audio id="voice" src="voice.wav" data-start="0" data-duration="${D}" data-track-index="9"></audio>` : ''}
+${voice ? `      <audio id="voice" src="${voice}" data-start="0" data-duration="${D}" data-track-index="9"></audio>` : ''}
     </div>
     <script>
       const SCENES = ${JSON.stringify(E)};
@@ -86,6 +89,7 @@ ${voice ? `      <audio id="voice" src="voice.wav" data-start="0" data-duration=
     return out;
   },
   texts(v) {
+    adapter.build(v);
     const r = hf(['check', 'project', '--json']);
     let j: any = null; try { j = JSON.parse(r.stdout.slice(r.stdout.indexOf('{'))); } catch { console.log('check: could not read the JSON output'); return null; }
     const L = j.layout || {}, lint: any[] = (j.lint?.findings || []).filter((f: any) => f.severity === 'error');

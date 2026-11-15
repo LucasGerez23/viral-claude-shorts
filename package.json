@@ -1,5 +1,5 @@
 {
-  "name": "viral-claude-shorts",
+  "name": "viral-codex-shorts",
   "private": true,
   "type": "module",
   "description": "The script's audio -> an animated 9:16 short. The pipeline runs on Node with TypeScript (no build step).",
@@ -7,7 +7,10 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "typecheck": "node core/typecheck.ts"
+    "typecheck": "node core/typecheck.ts",
+    "doctor": "node core/doctor.ts",
+    "test": "node --test tests/*.test.ts",
+    "setup:styles": "npm ci --prefix styles/flat2d && npm ci --prefix styles/3d"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

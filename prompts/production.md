@@ -1,13 +1,13 @@
 # Production prompt (for more control)
 
-You don't need this to make a video: in a chat opened in the project folder, dragging the audio in and saying "anima este audio" is enough (the project's `CLAUDE.md` makes Claude follow these same steps). Use this template when you want to give more details: assets, colors, tone or specific scenes.
+You don't need this to make a video: in a chat opened in the project folder, dragging the audio in and saying "anima este audio" is enough (the project's `AGENTS.md` makes Codex follow these same steps). Use this template when you want to give more details: assets, colors, tone or specific scenes.
 
-Open Claude Code in the `viral-claude-shorts` folder, copy the block below and, before sending it, fill in the lines that start with ✏️. Assets and notes are optional: if you don't need them, delete those lines. Claude picks the topic name.
+Open Codex in the `viral-codex-shorts` folder, copy the block below and, before sending it, fill in the lines that start with ✏️. Assets and notes are optional: if you don't need them, delete those lines. Codex picks the topic name.
 
 ```text
 Make an animated video with this repo's pipeline.
 
-- ✏️ **Audio:** `<path to your audio: wav, mp3 or m4a; you can drag the file in here>`. Pick a short topic name (lowercase, no spaces or accents), create `videos/<topic>/` and copy the audio there as `audio.<extension>`. If instead of audio there's a `videos/<topic>/script.json`, generate it with `node core/voice.ts videos/<topic>`: it comes out in ONE take so the intonation flows. If you write the script yourself, join the ideas with connectors ("verás", "pero", "así que", "por eso", "o sea"); without them it sounds choppy.
+- ✏️ **Audio:** `<path to your audio: wav, mp3 or m4a; you can drag the file in here>`. Pick a short topic name (lowercase, no spaces or accents), create `videos/<topic>/` and copy the audio there as `audio.<extension>`. The narration is supplied by the user; do not generate it or configure a voice service. If the user wants no narration, author duration, scene t0 and key t values in seconds and skip transcription/analysis.
 - ✏️ **Style:** `flat2d` or `3d`
 - ✏️ **Assets (optional):** `<paths to logos or screenshots>`; copy them to `videos/<topic>/assets/`
 - ✏️ **What I want to get across:** `<the idea in one sentence>`
@@ -19,7 +19,7 @@ The order matters: first you design and test the video's **world** (everything i
 
 1. **Read** `styles/<style>/USAGE.md` and look at that style's example videos to copy how they work (`flat2d`: `videos/blue-sky/`; `3d`: `videos/aviones/` and `videos/detail-demo/`, the second one for mixing simple and textured objects in one shared set).
 2. **Transcribe and analyze:**
-   - `.venv/bin/python core/transcribe.py videos/<topic>` (it assumes Spanish; for another language add `--language <code>`)
+   - `.venv/bin/python core/transcribe.py videos/<topic>` on macOS/Linux, or `.venv\Scripts\python.exe core/transcribe.py videos/<topic>` on Windows (it assumes Spanish; for another language add `--language <code>`)
    - `node core/analyze.ts videos/<topic>`
 
    Read the whole transcription and the idea before anything else. The phrase table with every word's `#` index will be your clock later.
@@ -50,6 +50,6 @@ The order matters: first you design and test the video's **world** (everything i
    Validate with `node core/scenes.ts videos/<topic>` and fix it until there are no errors.
 6. **Animate the scenes** with `defineVisuals({ ... })` in `videos/<topic>/visuals3d.ts` (`3d`) or `videos/<topic>/visuals.ts` (`flat2d`): each scene only assembles the world, following its `visual`: it places the pieces in their set, switches their states at its keys (`w.K('key')` in 3D, `K('key')` in flat2d) and runs its camera shot over the scene's time. New pieces don't go here: they go in the world. Keep the style's rules: fixed technique, determinism, title contrast and the **safe zone**: characters, objects and text inside x 80–1000, y 160–1600 (the same margin on both sides), because TikTok/Reels/Shorts cover the top, the bottom and the edges with their interface (only backgrounds fill the whole frame). `npm run typecheck` must have no errors.
 7. **Storyboard:** `node core/storyboard.ts videos/<topic>`. Look at `storyboard.png` yourself, fix whatever looks wrong (cuts, objects out of frame or in the red zones, unreadable text, anything that doesn't match `plan.md`) and build it again until every panel is right. Don't wait for me: go on.
-8. **Render:** `node core/render.ts videos/<topic>`. It synthesizes the soundtrack from the scenes (`core/music.ts`) and prints the score scene by scene: check it matches the curve you designed (moods, transitions, effects) and fix `scenes.json` if not. If `report.md` has any FAIL, fix it and render again. Then run `node core/preview.ts videos/<topic>`: if the preview is already open (from the setup or another chat) it reloads with this video, and if not it opens it.
+8. **Sound and render:** Read `docs/AUDIO.md`. Generate separate music, ambience and SFX with `node core/music.ts videos/<topic>`, then audition the mix using `node core/mix.ts videos/<topic> --audio-only` and the live preview. Custom music must not remove SFX. Add external licensed sounds through `audio.json` if needed. **Render:** `node core/render.ts videos/<topic>`. It synthesizes the soundtrack from the scenes (`core/music.ts`) and prints the score scene by scene: check it matches the curve you designed (moods, transitions, effects) and fix `scenes.json` if not. If `report.md` has any FAIL, fix it and render again. Then run `node core/preview.ts videos/<topic>`: if the preview is already open (from the setup or another chat) it reloads with this video, and if not it opens it.
 9. **Delivery**, in plain words: the path to `final.mp4`, the link the preview printed (to watch it with the audio), the storyboard (`storyboard.png`, numbered panels), the idea you understood in one line, the emotional curve of the music in one line, the report's numbers, what you fixed and what you couldn't verify (for example, you can't listen to the result). End by telling me I can ask for changes by panel number.
 ```

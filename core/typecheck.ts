@@ -6,13 +6,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..'), STYLES = path.join(ROOT, 'styles');
-const tsc = path.join(ROOT, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc');
+const tsc = path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 if (!fs.existsSync(tsc)) { console.error('typecheck: TypeScript is not installed. Run `npm install` at the project root first.'); process.exit(1); }
 const installed =fs.readdirSync(STYLES).filter((s) => fs.existsSync(path.join(STYLES, s, 'node_modules')));
 const configs = ['tsconfig.json', ...installed.flatMap((s) => [`styles/${s}/tsconfig.adapter.json`, `styles/${s}`])];
 let failed = false;
 for (const c of configs) {
-  const r = spawnSync(tsc, ['-p', c], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(process.execPath, [tsc, '-p', c], { cwd: ROOT, stdio: 'inherit' });
   if (r.status !== 0) { console.error(`  ^ errors in ${c}`); failed = true; }
 }
 console.log(failed ? 'typecheck: there are errors' : `typecheck ok: core${installed.map((s) => ', ' + s).join('')}`);

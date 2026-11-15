@@ -11,7 +11,7 @@
 //     similar -> a soft swish;
 //   - a short silence of the rhythm before every stat, then a hit (the number is the strong moment);
 //   - each key's sfx sounds exactly at its word, and each scene's ambience plays under it.
-// If you bring your own music, save it as videos/<topic>/own-music.wav and this step is skipped.
+// Always generate all stems; own-music.* replaces only music.wav in the mixer.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Plan } from './types.ts';
@@ -29,8 +29,13 @@ const BPM = Number(bpmArg ?? E.music?.bpm ?? 96);
 const km = /^([A-G])(#|s|b)?$/.exec(keyArg ?? E.music?.key ?? 'D');
 if (!km) { console.error('the key must be a note: C, D, Eb, F#…'); process.exit(1); }
 const ROOT = 48 + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[km[1] as 'C'] + (km[2] === '#' || km[2] === 's' ? 1 : km[2] === 'b' ? -1 : 0);   // C3 = 48
-const SR = 48000, DUR = E.duration, N = Math.ceil(DUR * SR), TAU = 2 * Math.PI;
-const L = new Float32Array(N), R = new Float32Array(N);
+const SR = 48000, DUR = E.duration, TAU = 2 * Math.PI;
+if (!Number.isFinite(DUR) || DUR <= 0 || DUR > 600) throw new Error('duration must be 0 < seconds <= 600');
+if (!Number.isFinite(BPM) || BPM < 20 || BPM > 300) throw new Error('bpm must be between 20 and 300');
+const N = Math.ceil(DUR * SR);
+const stems = Object.fromEntries(['music', 'sfx', 'ambience'].map(name => [name, {L: new Float32Array(N), R: new Float32Array(N)}]));
+let {L, R} = stems.music;
+const route = (name: string) => { ({L, R} = stems[name]); };
 
 // deterministic: the same plan always gives the same audio
 let seed = 1234567;
@@ -100,6 +105,7 @@ const AMB: Record<string, (t0: number, t1: number, g: (t: number) => number) => 
 // ---- render every scene with its mood
 const score: string[] = [];
 for (const { s, k, name, m } of S) {
+  route('music');
   const g = gateOf(k), a = k ? s.t0 - F : 0, b = k < S.length - 1 ? s.t1 + F : DUR;
   const inScene = (t: number) => t >= s.t0 - 0.001 && t < s.t1;
   for (let bar = Math.floor(a / BAR); bar * BAR < b; bar++) {
@@ -128,8 +134,10 @@ for (const { s, k, name, m } of S) {
   }
   // drone: a low root under the whole scene, breathing slowly
   if (m.drone > 0) { let y = 0; const f = hz(ROOT - 24 + chord(m, 0)[0]); add(a, b - a, (u, t) => { y += 0.03 * (osc('saw', TAU * f * u) - y); return (Math.sin(TAU * f * u) * 0.6 + y * 1.5) * (0.75 + 0.25 * Math.sin(TAU * 0.25 * t)); }, m.drone, 0, g); }
+  route('ambience');
   for (const amb of s.ambience || []) AMB[amb]?.(s.t0, s.t1, g);
   // the transition INTO this scene follows the change of energy
+  route('sfx');
   let into = '';
   if (k) {
     const dE = m.energy - S[k - 1].m.energy;
@@ -140,7 +148,10 @@ for (const { s, k, name, m } of S) {
   const sfx = (s.keys || []).filter((x) => x.sfx).map((x) => { SOUNDS[x.sfx!]?.(x.t); return `${x.sfx}@${x.t.toFixed(2)}`; });
   score.push(`  ${s.t0.toFixed(2).padStart(6)}–${s.t1.toFixed(2).padEnd(6)} ${s.id.padEnd(12)} ${name.padEnd(11)}${into ? ` in: ${into}` : ''}${s.ambience?.length ? `  amb: ${s.ambience.join('+')}` : ''}${sfx.length ? `  sfx: ${sfx.join(' ')}` : ''}`);
 }
+route('sfx');
 for (const t of statTimes) { impact(t, 0.8); SOUNDS.shimmer(t + 0.05); }
+for (const name of ['music', 'sfx', 'ambience']) {
+route(name);
 // outro: final fade
 for (let i = Math.max(0, N - SR); i < N; i++) { const g = (N - i) / SR; L[i] *= g; R[i] *= g; }
 // to 16-bit WAV (with a soft limiter)
@@ -149,6 +160,7 @@ buf.write('RIFF', 0); buf.writeUInt32LE(36 + N * 4, 4); buf.write('WAVE', 8); bu
 buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(SR, 24); buf.writeUInt32LE(SR * 4, 28); buf.writeUInt16LE(4, 32); buf.writeUInt16LE(16, 34);
 buf.write('data', 36); buf.writeUInt32LE(N * 4, 40);
 for (let i = 0; i < N; i++) { buf.writeInt16LE(Math.round(Math.tanh(L[i]) * 32000), 44 + i * 4); buf.writeInt16LE(Math.round(Math.tanh(R[i]) * 32000), 46 + i * 4); }
-fs.writeFileSync(path.join(VIDEO, 'music.wav'), buf);
-console.log(`music.wav: ${DUR.toFixed(2)} s, ${BPM} BPM in ${km[0]}, ${statTimes.length} stat hit(s)`);
+fs.writeFileSync(path.join(VIDEO, `${name}.wav`), buf);
+}
+console.log(`music.wav + sfx.wav + ambience.wav: ${DUR.toFixed(2)} s, ${BPM} BPM in ${km[0]}, ${statTimes.length} stat hit(s)`);
 for (const line of score) console.log(line);
