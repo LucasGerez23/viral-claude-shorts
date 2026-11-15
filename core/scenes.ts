@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Plan, Words } from './types.ts';
 import { AMBIENCE, MOODS, SFX } from './score.ts';
+import { readCues } from './audio.ts';
 
 const dir = process.argv[2];
 if (!dir) { console.error('usage: node core/scenes.ts videos/<topic>'); process.exit(2); }
@@ -47,8 +48,16 @@ E.fps ??= 30; E.format ??= '9:16';
 E.duration = P.duration;
 if (silent && !(E.duration > 0)) err.push('there is no voice (words.json): scenes.json needs "duration" in seconds');
 const S = E.scenes || [];
+if (!Number.isFinite(E.duration) || E.duration <= 0 || E.duration > 600) err.push('duration must be 0 < seconds <= 600');
+if (!Number.isInteger(E.fps) || E.fps < 1 || E.fps > 120) err.push('fps must be an integer from 1 to 120');
+if (E.format !== '9:16') err.push('only 9:16 format is supported');
+if (E.music?.bpm !== undefined && (!Number.isFinite(E.music.bpm) || E.music.bpm < 20 || E.music.bpm > 300)) err.push('bpm must be 20 to 300');
+const ids = new Set<string>();
+try { readCues(ROOT, E.duration); } catch (e) { err.push(String(e)); }
 if (!S.length) err.push('there are no scenes');
 S.forEach((s, k) => {
+  if (!s.id || ids.has(s.id)) err.push(`duplicate or empty scene id: ${s.id}`);
+  ids.add(s.id);
   if (!TYPES.includes(s.type)) err.push(`${s.id}: unknown type "${s.type}" (${TYPES.join(', ')})`);
   if (k === 0) s.t0 = 0;
   else if (silent) { if (typeof s.t0 !== 'number') err.push(`${s.id}: there is no voice, so the scene needs "t0" in seconds`); }
@@ -62,11 +71,13 @@ S.forEach((s, k) => {
 });
 S.forEach((s, k) => {
   s.t1 = k < S.length - 1 ? S[k + 1].t0 : E.duration;
+  if (!Number.isFinite(s.t0) || !Number.isFinite(s.t1) || s.t0 < 0 || s.t1 <= s.t0 || s.t1 > E.duration) err.push(`${s.id}: invalid scene interval`);
   if (s.t1 - s.t0 < 2.0) warn.push(`${s.id}: lasts ${(s.t1 - s.t0).toFixed(2)} s (under 2 s the animation can't be seen in full)`);
   if (k && s.t0 <= S[k - 1].t0) err.push(`${s.id}: starts before the previous scene (order of "from" or "t0")`);
   for (const c of s.keys || []) {
     if (!silent) c.t = +at(c.at, `${s.id}.${c.id}`).toFixed(3);
     else if (typeof c.t !== 'number') { err.push(`${s.id}.${c.id}: there is no voice, so the key needs "t" in seconds`); continue; }
+    if (!Number.isFinite(c.t)) err.push(`${s.id}.${c.id}: key time must be finite`);
     if (c.t < s.t0 - 1e-6 || c.t >= s.t1) err.push(`${s.id}.${c.id}: the key (${c.t}s) falls outside its scene (${s.t0}–${s.t1}s)`);
     else if (k < S.length - 1 && s.t1 - c.t < MARGIN) err.push(`${s.id}.${c.id}: the key lands ${(s.t1 - c.t).toFixed(2)} s before the cut: its animation would be left half done (leave ≥ ${MARGIN} s, or move it to the next scene)`);
   }

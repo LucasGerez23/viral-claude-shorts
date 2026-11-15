@@ -1,0 +1,2 @@
+# Optional: transcribe user-supplied narration; this does not generate a voice.
+faster-whisper>=1.1,<2
