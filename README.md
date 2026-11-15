@@ -97,3 +97,7 @@ Probá el motor sin voz con el ejemplo 3D `videos/detail-demo/`: validá sus esc
 - `.github/workflows/ci.yml`: instalación y pruebas en Linux y Windows.
 
 Dependencias principales: [HyperFrames](https://github.com/heygen-com/hyperframes), [GSAP](https://gsap.com), [Three.js](https://threejs.org), [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [FFmpeg](https://ffmpeg.org). Se conservan las versiones fijadas y sus lockfiles. Revisá las condiciones de cada dependencia y de los archivos externos antes de redistribuirlos.
+
+## Identidad visual
+
+El motor aplica la [identidad institucional](docs/IDENTIDAD.md) en 2D y 3D. Usá `theme: light` o `theme: dark` en `scenes.json`. Ejecutá `npm ci` en la raíz tras actualizar para instalar las fuentes locales.

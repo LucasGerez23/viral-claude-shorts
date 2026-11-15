@@ -45,6 +45,7 @@ const at = (i: number | undefined, what: string) => { if (i === undefined || !Nu
 
 if (!E.style || !fs.existsSync(path.join(REPO, 'styles', E.style, 'adapter.ts'))) err.push(`unknown style "${E.style}" (there is no styles/${E.style}/adapter.ts)`);
 E.fps ??= 30; E.format ??= '9:16';
+if (E.theme !== undefined && !['light', 'dark'].includes(E.theme)) err.push('theme must be light or dark');
 E.duration = P.duration;
 if (silent && !(E.duration > 0)) err.push('there is no voice (words.json): scenes.json needs "duration" in seconds');
 const S = E.scenes || [];

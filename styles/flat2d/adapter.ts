@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { transformSync } from 'esbuild';
+import { prepareIdentity } from '../../core/identity.ts';
 import type { Adapter, Plan, Words } from '../../core/types.ts';
 
 const HERE = import.meta.dirname, PROJ = path.join(HERE, 'project');
@@ -30,6 +31,7 @@ const adapter: Adapter = {
     const E: Plan = JSON.parse(fs.readFileSync(path.join(v, 'scenes.json'), 'utf8')), wf = path.join(v, 'words.json');
     const P: Words = fs.existsSync(wf) ? JSON.parse(fs.readFileSync(wf, 'utf8')) : { duration: E.duration, words: [] };   // no voice: a silent animation
     fs.mkdirSync(PROJ, { recursive: true });
+    const identity = prepareIdentity(PROJ, E.theme);
     fs.copyFileSync(path.join(HERE, 'node_modules', 'gsap', 'dist', 'gsap.min.js'), path.join(PROJ, 'gsap.min.js'));
     fs.copyFileSync(path.join(HERE, 'theme.css'), path.join(PROJ, 'theme.css'));
     for (const f of ['engine', 'library']) fs.writeFileSync(path.join(PROJ, `${f}.js`), toJs(path.join(HERE, `${f}.ts`)));
@@ -51,6 +53,9 @@ const adapter: Adapter = {
     <title>${esc(path.basename(v))} (flat 2D)</title>
     <script src="gsap.min.js"></script>
     <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="identity.css" />
+    <link rel="preload" href="manrope.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fraunces.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="${D}" data-width="1080" data-height="1920">
@@ -58,6 +63,7 @@ ${sections}
 ${voice ? `      <audio id="voice" src="${voice}" data-start="0" data-duration="${D}" data-track-index="9"></audio>` : ''}
     </div>
     <script>
+      const BRAND = Object.freeze(${JSON.stringify(identity)});
       const SCENES = ${JSON.stringify(E)};
       const WORDS = ${JSON.stringify(P.words)};
     </script>
